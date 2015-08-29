@@ -1,0 +1,20 @@
+{
+    "version": "1.0.0-*",
+    "description": "Sandbox Console Application",
+    "authors": [ "espeelman" ],
+    "tags": [ "" ],
+    "projectUrl": "",
+    "licenseUrl": "",
+
+    "dependencies": {
+        "NuDB": "1.0.0-*"
+    },
+
+    "commands": {
+        "Sandbox": "Sandbox"
+    },
+
+    "frameworks": {
+        "dnx46": { }
+    }
+}

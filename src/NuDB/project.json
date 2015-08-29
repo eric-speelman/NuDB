@@ -1,0 +1,16 @@
+﻿{
+  "version": "1.0.0-*",
+  "description": "NuDB Class Library",
+  "authors": [ "espeelman" ],
+  "tags": [ "" ],
+  "projectUrl": "",
+  "licenseUrl": "",
+
+  "dependencies": {
+    "Newtonsoft.Json": "7.0.1"
+  },
+
+  "frameworks": {
+    "dnx46": { }
+  }
+}
