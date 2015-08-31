@@ -5,7 +5,7 @@ using System.IO;
 using Newtonsoft.Json;
 using NuDB.Exceptions;
 using System.Text;
-
+using System.Reflection;
 
 namespace NuDB
 {
@@ -37,12 +37,13 @@ namespace NuDB
                 setInstance = _instanceDictionary[fullPath].SetInstances.Where(x => x.Name == set.Name).SingleOrDefault();
                 if (setInstance == null)
                 {
-                    setInstance = new SetInstance() { Type = set.FieldType, Name = set.Name, Instance = set.FieldType.GetConstructor(new Type[2] { nuEngineType, stringType }).Invoke(new object[2] { this, set.Name }) };
+                    setInstance = new SetInstance() { Type = set.FieldType, GenericType = set.FieldType.GetGenericArguments().First(), Name = set.Name, AddWithoutSaving = set.FieldType.GetMethod("AddWithoutSaving"), Instance = set.FieldType.GetConstructor(new Type[2] { nuEngineType, stringType }).Invoke(new object[2] { this, set.Name }) };
                     _engineInstance.SetInstances.Add(setInstance);
-                    _engineInstance.FileStream = File.Open(fullPath, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.ReadWrite);
-                    lock(_engineInstance.FileStream)
+                    var fileStream = File.Open(fullPath, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.ReadWrite);
+                    lock(fileStream)
                     {
-                        var streamReader = new StreamReader(_engineInstance.FileStream).ReadToEnd();
+                        ReadLog(fileStream);
+                        _engineInstance.Writer = new StreamWriter(fileStream);
                     }
                 }
                 else if(setInstance.Type != set.FieldType)
@@ -64,18 +65,53 @@ namespace NuDB
 
         internal void Add<T>(string Name, T item)
         {
-            var data = JsonConvert.SerializeObject(item);
-            var bytes = Encoding.UTF8.GetBytes($"ADD {Name} {data}\n");
-            lock(_engineInstance.FileStream)
+            var json = JsonConvert.SerializeObject(item);
+            var data = $"ADD {Name} {json}";
+            lock(_engineInstance.Writer)
             {
-                _engineInstance.FileStream.Write(bytes, 0, bytes.Count());
+                _engineInstance.Writer.WriteLine(data);
+                _engineInstance.Writer.Flush();
             }
             
         }
 
-        private void ReadLog(SetInstance instance)
+        private void ReadLog(FileStream stream)
         {
-        
+            var reader = new StreamReader(stream);
+            var setDictionary = new Dictionary<string, SetInstance>();
+            var deserializers = new Dictionary<Type, MethodInfo>();
+            while(!reader.EndOfStream)
+            {
+                var tokens = reader.ReadLine().Split(new char[] { ' ' }, 3);
+                if(tokens.Count() != 3)
+                {
+                    throw new InvalidLogFileException($"Unexpected number of tokens {tokens.Count()}");
+                }
+                var op = tokens[0].ToLower();
+                if(op == "add")
+                {
+                    var setName = tokens[1];
+                    if(!setDictionary.ContainsKey(tokens[1]))
+                    {
+                        var setInstance = _engineInstance.SetInstances.Where(x => x.Name == setName).SingleOrDefault();
+                        setDictionary.Add(setName, setInstance);
+                    }
+                    var set = setDictionary[setName];
+                    if (set != null)
+                    {
+                        if(!deserializers.ContainsKey(set.GenericType))
+                        {
+                            deserializers.Add(set.GenericType, typeof(JsonConvert).GetMethods().Where(x => x.Name == "DeserializeObject" && x.IsGenericMethod && x.IsStatic && x.GetParameters().Count() == 1).Single().MakeGenericMethod(new Type[] { set.GenericType }));
+                        }
+                        var item = deserializers[set.GenericType].Invoke(null, new object[] { tokens[2] });
+                        set.AddWithoutSaving.Invoke(set.Instance, new object[] { item });
+                    }
+                }else
+                {
+                    throw new InvalidLogFileException($"Unexpected operation {op}");
+                }
+
+            }
         }
 
         private EngineInstance _engineInstance;
@@ -87,12 +123,14 @@ namespace NuDB
         {
             SetInstances = new List<SetInstance>();
         }
-        public FileStream FileStream { get; set; }
+        public StreamWriter Writer { get; set; }
         public List<SetInstance> SetInstances { get; set; }
     }
     class SetInstance
     {
         public Type Type { get; set; }
+        public Type GenericType { get; set; }
+        public MethodInfo AddWithoutSaving { get; set; }
         public string Name { get; set; }
         public object Instance { get; set; }
     }

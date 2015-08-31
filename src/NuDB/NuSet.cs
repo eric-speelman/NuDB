@@ -39,6 +39,11 @@ namespace NuDB
             _collection.Add(item);
         }
 
+        public void AddWithoutSaving(TData item)
+        {
+            _collection.Add(item);
+        }
+
         public void Clear()
         {
             _collection.Clear();

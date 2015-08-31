@@ -58,11 +58,14 @@ namespace NuDB.Test
         public void SavesComplexObjects()
         {
             var engine = new ComplexEngine();
-            var obj = new ComplexObj();
-            obj.SomeInt = 5;
-            obj.SomeString = "aaaa\n\n\n\nbbbbbbbb";
-            obj.StringList = new List<string>() { "aaaaaa", "bbbbbbbbbbb", "cccccc\n\n\n\nn\"ddddddd", "eee   eeee  eeeeee" };
-            engine.Obj.Add(obj);
+            for (var i = 0; i < 1000000; i++)
+            {
+                var obj = new ComplexObj();
+                obj.SomeInt = 5;
+                obj.SomeString = "aaaa\n\n\n\nbbbbbbbb";
+                obj.StringList = new List<string>() { "aaaaaa", "bbbbbbbbbbb", "cccccc\n\n\n\nn\"ddddddd", "eee   eeee  eeeeee" };
+                engine.Obj.Add(obj);
+            }
         }
     }
 
